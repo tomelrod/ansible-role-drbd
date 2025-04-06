@@ -1,9 +1,66 @@
 ---
-- name: disks | Partitioning Disks
-  parted:
-    device: "{{ item['disk'] }}"
-    number: "{{ item['partitions'] }}"
-    state: "{{ item['state'] }}"
+- name: Disk | Create resource config
+  ansible.builtin.template:
+    src: etc/drbd.d/resource.res.j2
+    dest: /etc/drbd.d/{{ item['resource'] }}.res
+    owner: root
+    group: root
+    mode: "u=rw,g=r,o=r"
   become: true
   with_items: "{{ drbd_disks }}"
-  when: drbd_use_parted
+
+- name: Exit
+  ansible.builtin.meta: end_play
+
+- name: Disk | Checking DRBD Mirror Devices Creation Status
+  ansible.builtin.stat:
+    path: "/etc/drbd.d/.{{ item['resource'] }}.created"
+  register: _drbd_mirror_device_creation_status
+  with_items: "{{ drbd_disks }}"
+
+- name: Disk | Creating DRBD Mirror Devices
+  ansible.builtin.command: drbdadm create-md {{ item['resource'] }}
+  become: true
+  register: _drbd_mirror_device_created
+  with_items: "{{ _drbd_mirror_device_creation_status['results'] }}"
+  when: not item['stat']['exists']
+
+- name: Disk | Marking DRDB Mirror Devices Created
+  ansible.builtin.file:
+    path: "/etc/drbd.d/.{{ item['resource'] }}.created"
+    state: touch
+    owner: root
+    group: root
+    mode: "u=rw,g=r,o=r"
+  become: true
+  with_items: "{{ _drbd_mirror_device_created['results'] }}"
+  when: item['changed']
+
+- name: Disk | Bringing DRBD Mirror Devices Up
+  ansible.builtin.command: drbdadm up {{ item['resource'] }}
+  become: true
+  register: _drbd_mirror_device_up
+  with_items: "{{ drbd_disks}}"
+  when: >
+        _drbd_mirror_device_created['changed']
+
+# Add option to make a specific node primary, if not go with first in list as default
+- name: Disk | Defining DRBD Primary
+  ansible.builtin.command: drbdsetup primary --overwrite-data-of-peer {{ item['resource'] }}
+  become: true
+  register: _drbd_primary
+  with_items: "{{ drbd_disks }}"
+  when: >
+        _drbd_mirror_device_up['changed'] and
+        inventory_hostname == groups[drbd_group][0]
+
+- name: Disk | Waiting For DRBD Sync To Complete
+  ansible.builtin.command: drbd-overview
+  become: true
+  register: _drbd_sync
+  until: ('Inconsistent' not in _drbd_sync['stdout'])
+  retries: 100
+  delay: 30
+  when: >
+        _drbd_primary['changed'] and
+        inventory_hostname == groups[drbd_group][0]

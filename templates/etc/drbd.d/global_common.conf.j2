@@ -1,27 +1,25 @@
 # {{ ansible_managed }}
+
+# DRBD is the result of over a decade of development by LINBIT.
+# In case you need professional services for DRBD or have
+# feature requests visit http://www.linbit.com
+
 global {
-	usage-count no;
+    usage-count no;
+    udev-always-use-vnr;
+
+    # minor-count dialog-refresh disable-ip-verification
+    # cmd-timeout-short 5; cmd-timeout-medium 121; cmd-timeout-long 600;
 }
 
 common {
-{% for section in drbd_common.keys() %}
-  {{ section }} {
-{%   for line in drbd_common[section].splitlines() %}
-    {{ line }}
-{%   endfor %}
-  }
-{% endfor %}
-}
 
-{% for disk in drbd_disks %}
-resource {{ disk['resource'] }} {
-{%   for host in groups[drbd_group] %}
-  on {{ hostvars[host]['inventory_hostname_short'] }} {
-    device {{ disk['device'] }};
-    disk {{ disk['use_partition'] }};
-    address {{ hostvars[host]['ansible_' + drbd_interface]['ipv4']['address'] }}:7788;
-    meta-disk internal;
-  }
+{% for section in drbd_common.keys() %}
+    {{ section }} {
+{%   for line in drbd_common[section].splitlines() %}
+        {{ line }}
 {%   endfor %}
-}
+    }
 {% endfor %}
+
+}

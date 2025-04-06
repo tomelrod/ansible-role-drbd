@@ -1,24 +1,70 @@
 ---
 # defaults file for ansible-drbd
 drbd_common:
-  disk: ''
+  disk: |
+    # size on-io-error fencing disk-barrier disk-flushes
+    # disk-drain md-flushes resync-rate resync-after al-extents
+    # c-plan-ahead c-delay-target c-fill-target c-max-rate
+    # c-min-rate disk-timeout
   net: |
-    cram-hmac-alg sha1;
+    # protocol timeout max-epoch-size max-buffers
+    # connect-int ping-int sndbuf-size rcvbuf-size ko-count
+    # allow-two-primaries cram-hmac-alg shared-secret after-sb-0pri
+    # after-sb-1pri after-sb-2pri always-asbp rr-conflict
+    # ping-timeout data-integrity-alg tcp-cork on-congestion
+    # congestion-fill congestion-extents csums-alg verify-alg
+    # use-rle
+    #fencing resource-and-stonith;
+    verify-alg sha1;
+    protocol C;
+    allow-two-primaries no;
+    cram-hmac-alg "sha256";
     shared-secret "{{ drbd_network_shared_secret }}";
-  handlers: ''
-  startup: ''
-  options: ''
+  handlers: |
+    # These are EXAMPLE handlers only.
+    # They may have severe implications,
+    # like hard resetting the node under certain circumstances.
+    # Be careful when choosing your poison.
+
+    # IMPORTANT: most of the following scripts symlink to "notify.sh" which tries to send mail via "mail".
+    # If you intend to use this notify.sh script make sure that "mail" is installed.
+    #
+    # pri-on-incon-degr "/usr/lib/drbd/notify-pri-on-incon-degr.sh; /usr/lib/drbd/notify-emergency-reboot.sh; echo b > /proc/sysrq-trigger ; reboot -f";
+    # pri-lost-after-sb "/usr/lib/drbd/notify-pri-lost-after-sb.sh; /usr/lib/drbd/notify-emergency-reboot.sh; echo b > /proc/sysrq-trigger ; reboot -f";
+    # local-io-error "/usr/lib/drbd/notify-io-error.sh; /usr/lib/drbd/notify-emergency-shutdown.sh; echo o > /proc/sysrq-trigger ; halt -f";
+    # fence-peer "/usr/lib/drbd/crm-fence-peer.sh";
+    # split-brain "/usr/lib/drbd/notify-split-brain.sh root";
+    # out-of-sync "/usr/lib/drbd/notify-out-of-sync.sh root";
+    # before-resync-target "/usr/lib/drbd/snapshot-resync-target-lvm.sh -p 15 -- -c 16k";
+    # after-resync-target /usr/lib/drbd/unsnapshot-resync-target-lvm.sh;
+    # quorum-lost "/usr/lib/drbd/notify-quorum-lost.sh root";
+    # disconnected /bin/true;
+  startup: |
+    # wfc-timeout degr-wfc-timeout outdated-wfc-timeout wait-after-sb
+  options: |
+    # cpu-mask on-no-data-accessible
+
+    # RECOMMENDED for three or more storage nodes with DRBD 9:
+    # quorum majority;
+    # on-no-quorum suspend-io | io-error;
 
 drbd_disks:
-  - device: /dev/drbd0
-    disk: /dev/sdb
-    filesystem: ext4
-    partitions: 1
-    mountpoint: /opt/nfs
-    mountopts: defaults
-    resource: r0
+  - resource: r0
     state: present
-    use_partition: /dev/sdb1
+    port: 7788
+    volumes:
+      - device: /dev/drbd0
+        disk: /dev/sdb
+        meta_disk: internal
+    handlers: |
+      #fence-peer "/usr/lib/drbd/crm-fence-peer.9.sh";
+      #unfence-peer "/usr/lib/drbd/crm-unfence-peer.9.sh";
+    net: |
+      protocol C;
+      allow-two-primaries no;
+      #fencing resource-and-stonith;
+      verify-alg sha1;
+      cram-hmac-alg "sha256";
 
 drbd_group: test_nodes
 
@@ -26,15 +72,18 @@ drbd_interface: enp0s8
 
 drbd_network_shared_secret: wXE8MqVa
 
-drbd_vip: 192.168.250.100
-
 # Debian9/Ubuntu have included drbd support.
 drbd_deb_packages: ['drbd8-utils']
 # Additional yum repo required. See ELREPO for prebuilt RHEL RPMS, or your local site administrator.
-drbd_rpm_packages: ['drbd84-utils', 'kmod-drbd84']
+drbd_rpm_packages:
+  - kmod-drbd9x
+  - drbd9x-utils
+  # These packages are from EPEL
+  # - drbd-selinux
+  # - drbd-bash-completion # wants drbd-utils and drbd-selinux
+  # - drbd-pacemaker # wants drbd-utils and drbd-selinux
+  # - drbd-udev # wants drbd-utils and drbd-selinux
 
 # Toggle
-drbd_use_heartbeat: true
-drbd_use_parted: true
-drbd_unicast_mode: false
-drbd_unicast_port: 694
+# drbd_unicast_mode: false
+# drbd_unicast_port: 694

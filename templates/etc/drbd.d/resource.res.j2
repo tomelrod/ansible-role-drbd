@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+
+resource "{{ item['resource'] }}" {
+
+    net {
+{% for line in item['net'].splitlines() %}
+        {{ line }}
+{% endfor %}
+    }
+
+    handlers {
+{% for line in item['handlers'].splitlines() %}
+        {{ line }}
+{% endfor %}
+    }
+
+{% for volume in item['volumes'] %}
+    volume {{ loop.index0 }} {
+        device {{ volume['device'] }};
+        disk {{ volume['disk'] }};
+        meta-disk {{ volume['meta_disk'] | default("internal") }};
+    }
+{% endfor %}
+
+{% for host in groups[drbd_group] %}
+    on {{ hostvars[host]['inventory_hostname_short'] }} {
+        node-id {{ loop.index0 }};
+        address ipv4 {{ hostvars[host]['ansible_' + drbd_interface]['ipv4']['address'] }}:{{ item['port'] }};
+    }
+{% endfor %}
+
+}

@@ -1,34 +1,28 @@
 ---
 # tasks file for ansible-drbd
 
-- include_tasks: debian.yml
-  tags:
-    - drbd
-  when: ansible_os_family == "Debian"
+# - name: Debian
+#   ansible.builtin.include_tasks: debian.yml
+#   tags:
+#     - drbd
+#     - drbd-install
+#   when: ansible_os_family == "Debian"
 
-- include_tasks: redhat.yml
+- name: Red Hat
+  ansible.builtin.include_tasks: redhat.yml
   tags:
     - drbd
+    - drbd-install
   when: ansible_os_family == "RedHat"
 
-- include_tasks: disks.yml
+- name: Config
+  ansible.builtin.include_tasks: config.yml
   tags:
     - drbd
     - drbd-config
+
+- name: Disk Setup
+  ansible.builtin.include_tasks: disks.yml
+  tags:
+    - drbd
     - drbd-disks
-
-- include_tasks: heartbeat.yml
-  tags:
-    - drbd
-    - drbd-heartbeat
-  when: drbd_use_heartbeat
-
-- include_tasks: config.yml
-  tags:
-    - drbd
-    - drbd-config
-
-- include_tasks: services.yml
-  tags:
-    - drbd
-    - drbd-services
