@@ -9,9 +9,6 @@
   become: true
   with_items: "{{ drbd_disks }}"
 
-- name: Exit
-  ansible.builtin.meta: end_play
-
 - name: Disk | Checking DRBD Mirror Devices Creation Status
   ansible.builtin.stat:
     path: "/etc/drbd.d/.{{ item['resource'] }}.created"
@@ -19,15 +16,20 @@
   with_items: "{{ drbd_disks }}"
 
 - name: Disk | Creating DRBD Mirror Devices
-  ansible.builtin.command: drbdadm create-md {{ item['resource'] }}
+  ansible.builtin.command: drbdadm create-md {{ item['item']['resource'] }}
   become: true
   register: _drbd_mirror_device_created
   with_items: "{{ _drbd_mirror_device_creation_status['results'] }}"
   when: not item['stat']['exists']
 
+- name: Debug
+  debug:
+    var: item['item']['item']
+  with_items: "{{ _drbd_mirror_device_created['results'] }}"
+
 - name: Disk | Marking DRDB Mirror Devices Created
   ansible.builtin.file:
-    path: "/etc/drbd.d/.{{ item['resource'] }}.created"
+    path: "/etc/drbd.d/.{{ item['item']['item']['resource'] }}.created"
     state: touch
     owner: root
     group: root
@@ -35,6 +37,9 @@
   become: true
   with_items: "{{ _drbd_mirror_device_created['results'] }}"
   when: item['changed']
+
+- name: Exit
+  ansible.builtin.meta: end_play
 
 - name: Disk | Bringing DRBD Mirror Devices Up
   ansible.builtin.command: drbdadm up {{ item['resource'] }}
